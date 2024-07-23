@@ -1,0 +1,133 @@
+{
+	"name": "df_transform_cases_death",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_case_and_death_data",
+						"type": "DatasetReference"
+					},
+					"name": "CaseAndDeathSource"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_lookup_country",
+						"type": "DatasetReference"
+					},
+					"name": "LookupCountryCode"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_sink_case_and_death_count",
+						"type": "DatasetReference"
+					},
+					"name": "SinkDatabase"
+				}
+			],
+			"transformations": [
+				{
+					"name": "FilterEuropeOnly"
+				},
+				{
+					"name": "SelectOnlyRequiredField"
+				},
+				{
+					"name": "PivotCountCases"
+				},
+				{
+					"name": "changedColumnDataTozero"
+				},
+				{
+					"name": "MakeWeeklyCountToInteger"
+				},
+				{
+					"name": "lookupCountry"
+				},
+				{
+					"name": "SelectOnlyRequiredFields"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          country as string,",
+				"          country_code as string,",
+				"          continent as string,",
+				"          population as integer,",
+				"          indicator as string,",
+				"          weekly_count as string,",
+				"          year_week as string,",
+				"          rate_14_day as double,",
+				"          cumulative_count as string,",
+				"          source as string,",
+				"          note as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> CaseAndDeathSource",
+				"source(output(",
+				"          country as string,",
+				"          country_code_2_digit as string,",
+				"          country_code_3_digit as string,",
+				"          continent as string,",
+				"          population as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> LookupCountryCode",
+				"MakeWeeklyCountToInteger filter(continent == \"Europe\" && not(isNull(country_code))) ~> FilterEuropeOnly",
+				"FilterEuropeOnly select(mapColumn(",
+				"          country,",
+				"          country_code,",
+				"          population,",
+				"          indicator,",
+				"          weekly_count,",
+				"          year_week,",
+				"          source",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectOnlyRequiredField",
+				"SelectOnlyRequiredField pivot(groupBy(country,",
+				"          country_code,",
+				"          population,",
+				"          year_week,",
+				"          source),",
+				"     pivotBy(indicator, ['cases', 'deaths']),",
+				"     Count = sum(weekly_count),",
+				"     columnNaming: '$N_$V',",
+				"     lateral: true) ~> PivotCountCases",
+				"CaseAndDeathSource derive(weekly_count = iif(equals(weekly_count,\"NA\"), \"0\", weekly_count)) ~> changedColumnDataTozero",
+				"changedColumnDataTozero derive(weekly_count = toInteger(weekly_count)) ~> MakeWeeklyCountToInteger",
+				"PivotCountCases, LookupCountryCode lookup(PivotCountCases@country == LookupCountryCode@country,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> lookupCountry",
+				"lookupCountry select(mapColumn(",
+				"          country = PivotCountCases@country,",
+				"          country_code_2_digit,",
+				"          country_code_3_digit,",
+				"          population = PivotCountCases@population,",
+				"          year_week,",
+				"          Count_cases,",
+				"          Count_deaths,",
+				"          source",
+				"     ),",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true) ~> SelectOnlyRequiredFields",
+				"SelectOnlyRequiredFields sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     partitionFileNames:['cases_and_death.csv'],",
+				"     truncate: true,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     partitionBy('hash', 1)) ~> SinkDatabase"
+			]
+		}
+	}
+}

@@ -1,0 +1,37 @@
+{
+	"name": "pl_data_population_processed",
+	"properties": {
+		"activities": [
+			{
+				"name": "df_transform_data_population_by_age",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_transform_data_population_by_age",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			}
+		],
+		"folder": {
+			"name": "Processed"
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-07-16T15:36:15Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
